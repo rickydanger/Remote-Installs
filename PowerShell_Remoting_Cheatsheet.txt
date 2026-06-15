@@ -1,0 +1,150 @@
+================================================================================
+                    POWERSHELL REMOTING CHEATSHEET
+================================================================================
+Source: NetSPI PowerShell Remoting Cheatsheet (Cleaned & Simplified)
+Date: June 2026
+
+PowerShell Remoting is a native Windows remote command execution feature
+built on top of the Windows Remote Management (WinRM) protocol.
+
+================================================================================
+ENABLING POWERShell REMOTING
+================================================================================
+
+1. Enable PowerShell Remoting (Run PowerShell as Administrator):
+
+Enable-PSRemoting –Force
+
+
+2. Set WinRM service to start automatically:
+
+Set-Service WinRM -StartMode Automatic
+
+# Verify service status
+Get-WmiObject -Class win32_service | Where-Object {$_.name -like "WinRM"}
+
+
+3. Set Trusted Hosts (Use with caution - only for trusted environments):
+
+# Trust all hosts
+Set-Item WSMan:\localhost\Client\TrustedHosts -Value *
+
+# Verify trusted hosts
+Get-Item WSMan:\localhost\Client\TrustedHosts
+
+
+================================================================================
+EXECUTING REMOTE COMMANDS
+================================================================================
+
+--- Run a Single Command on a Remote System ---
+
+Invoke-Command -ComputerName MyServer1 -ScriptBlock { Hostname }
+
+# With alternate credentials
+Invoke-Command -ComputerName MyServer1 -Credential demo\serveradmin -ScriptBlock { Hostname }
+
+
+--- Run a Local Script on a Remote System ---
+
+Invoke-Command -ComputerName MyServer1 -FilePath C:\pentest\Invoke-Mimikatz.ps1
+
+# With credentials
+Invoke-Command -ComputerName MyServer1 -FilePath C:\pentest\Invoke-Mimikatz.ps1 -Credential demo\serveradmin
+
+
+--- Run Commands on Multiple Systems (using Active Directory module) ---
+
+Get-ADComputer -Filter * -Properties name |
+    Select-Object @{Name="ComputerName";Expression={$_.name}} |
+    Invoke-Command -ScriptBlock { Hostname }
+
+
+================================================================================
+INTERACTIVE POWERShell SESSION
+================================================================================
+
+Start an interactive session on a remote computer:
+
+Enter-PSSession -ComputerName server1.domain.com
+
+# With credentials
+Enter-PSSession -ComputerName server1.domain.com -Credential domain\serveradmin
+
+Exit the interactive session:
+
+Exit-PSSession
+
+
+================================================================================
+BACKGROUND SESSIONS (New-PSSession)
+================================================================================
+
+Create a background session:
+
+New-PSSession -ComputerName server1.domain.com
+
+# With credentials
+New-PSSession -ComputerName server1.domain.com -Credential domain\serveradmin
+
+
+Create sessions for all domain computers (requires Active Directory module):
+
+New-PSDrive -PSProvider ActiveDirectory -Name RemoteADS -Root "" -Server a.b.c.d -Credential domain\user
+cd RemoteADS:
+Get-ADComputer -Filter * -Properties name |
+    Select-Object @{Name="ComputerName";Expression={$_.name}} |
+    New-PSSession
+
+
+================================================================================
+MANAGING BACKGROUND SESSIONS
+================================================================================
+
+List all active sessions:
+
+Get-PSSession
+
+
+Interact with a specific session by ID:
+
+Enter-PSSession -Id 3
+
+
+Exit interactive session (returns it to background):
+
+Exit-PSSession
+
+
+Run a command against ALL active sessions:
+
+Invoke-Command -Session (Get-PSSession) -ScriptBlock { Hostname }
+
+
+Remove / Disconnect all active sessions:
+
+Get-PSSession | Disconnect-PSSession
+
+
+================================================================================
+QUICK REFERENCE
+================================================================================
+
+Goal                                    | Recommended Command
+----------------------------------------|---------------------------
+Run one command on a remote host        | Invoke-Command
+Interactive session on one system       | Enter-PSSession
+Multiple commands across many systems   | New-PSSession + Invoke-Command
+List active background sessions         | Get-PSSession
+Remove active sessions                  | Disconnect-PSSession
+
+================================================================================
+TIPS
+================================================================================
+
+- Always run Enable-PSRemoting as Administrator on target machines first.
+- Use -Credential when connecting from a non-domain machine or with different privileges.
+- Background sessions (New-PSSession) are more efficient when running multiple commands.
+- Be careful with TrustedHosts - only use "*" in lab or highly trusted environments.
+
+================================================================================
